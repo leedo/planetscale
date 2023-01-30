@@ -7,7 +7,7 @@ import (
 
 	"github.com/fastly/compute-sdk-go/edgedict"
 	"github.com/fastly/compute-sdk-go/fsthttp"
-	_ "github.com/leedo/planetscale-go"
+	_ "github.com/leedo/planetscale"
 )
 
 func main() {
