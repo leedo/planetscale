@@ -1,4 +1,4 @@
-module github.com/leedo/planetscale/sample_app
+module github.com/leedo/planetscale-go/sample_app
 
 go 1.19
 
