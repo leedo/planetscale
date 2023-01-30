@@ -1,19 +1,24 @@
 package planetscale
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
-	"strings"
 
 	"github.com/fastly/compute-sdk-go/fsthttp"
+	"github.com/valyala/fastjson"
 )
 
 const (
 	executorEndpoint = "/psdb.v1alpha1.Database/Execute"
+	sessionEndpoint  = "/psdb.v1alpha1.Database/CreateSession"
 	executorMethod   = "POST"
 )
 
@@ -24,6 +29,7 @@ type PsConn struct {
 	password string
 	host     string
 	backend  string
+	session  *PsSession
 }
 
 func (d PsDriver) Open(dsn string) (driver.Conn, error) {
@@ -57,28 +63,93 @@ func (c *PsConn) Rollback() (driver.Stmt, error) {
 	return nil, fmt.Errorf("Rollback method not implemented")
 }
 
-func (c *PsConn) buildApiReq(body string) (*fsthttp.Request, error) {
-	b := strings.NewReader(body)
-	u := fmt.Sprintf("https://%s:%s@%s%s", c.username, c.password, c.host, executorEndpoint)
-	return fsthttp.NewRequest(executorMethod, u, b)
+func (c *PsConn) buildRequest(endpoint string, body []byte) (*fsthttp.Request, error) {
+	u := fmt.Sprintf("https://%s:%s@%s%s", c.username, c.password, c.host, endpoint)
+
+	req, err := fsthttp.NewRequest(executorMethod, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Body = io.NopCloser(bytes.NewReader(body))
+
+	auth := base64.StdEncoding.EncodeToString([]byte(c.username + ":" + c.password))
+	req.Header.Add("Host", c.host)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("User-Agent", "database-go")
+	req.Header.Add("Authorization", "Basic "+auth)
+
+	return req, nil
+}
+
+func (c *PsConn) sendRequest(ctx context.Context, req *fsthttp.Request) ([]byte, error) {
+	resp, err := req.Send(ctx, c.backend)
+	if err != nil {
+		return nil, err
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("planetscale API error reading response body: %s", err)
+	}
+
+	if resp.StatusCode != fsthttp.StatusOK {
+
+		return nil, fmt.Errorf("planetscale API error: %d\n%s", resp.StatusCode, respBody)
+	}
+
+	return respBody, nil
 }
 
 func (c *PsConn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	return c.QueryContext(context.Background(), query, args)
 }
 
+func (c *PsConn) refreshSession(ctx context.Context) error {
+	log.Println("refreshing session")
+	req, err := c.buildRequest(sessionEndpoint, []byte("{}"))
+	if err != nil {
+		return err
+	}
+
+	respBody, err := c.sendRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	var p fastjson.Parser
+	v, err := p.ParseBytes(respBody)
+
+	c.session = v.GetObject("session")
+	return nil
+}
+
 func (c *PsConn) QueryContext(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
-	req, err := c.buildApiReq(query)
+	if c.session == nil {
+		if err := c.refreshSession(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	log.Println("sending query")
+
+	q := json.Marshal(query)
+
+	body := []byte(`{"query":`)
+	body = append(body, q[:])
+	body = append(body, []byte(`,"session"`))
+	body = c.session.MarshalTo(body)
+	body = append(body, []byte(`}`))
+
+	req, err := c.buildRequest(executorEndpoint, body)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := req.Send(ctx, c.backend)
+	_, err = c.sendRequest(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("%v+", resp)
 
 	return nil, nil
 }
