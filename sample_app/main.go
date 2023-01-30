@@ -53,7 +53,14 @@ func main() {
 			username, password, host, backend,
 		)
 
-		_, err = sql.Open("planetscale", dsn)
+		db, err := sql.Open("planetscale", dsn)
+		if err != nil {
+			w.WriteHeader(fsthttp.StatusBadGateway)
+			fmt.Fprintln(w, err)
+			return
+		}
+
+		_, err = db.QueryContext(ctx, query)
 		if err != nil {
 			w.WriteHeader(fsthttp.StatusBadGateway)
 			fmt.Fprintln(w, err)

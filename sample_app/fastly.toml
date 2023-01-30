@@ -9,8 +9,9 @@ name = "sample_app"
 service_id = ""
 
 [local_server]
-[local_server.backenends.planetscale]
-url = "https://aws.connect.psdb.cloud"
+[local_server.backends.planetscale]
+url = "https://aws.connect.psdb.cloud/"
+
 
 [local_server.dictionaries]
 [local_server.dictionaries.planetscale_config]
