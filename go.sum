@@ -1,2 +1,4 @@
 github.com/fastly/compute-sdk-go v0.1.1 h1:Kz4ggWOVMyoTdkTTbTgPgZ3RB2DKANIb+EWXRNs/eh0=
 github.com/fastly/compute-sdk-go v0.1.1/go.mod h1:Nsi7SyXNUrLdN0apygSKiFeUzJSpTrIu9iDemKA0Z3s=
+github.com/valyala/fastjson v1.6.4 h1:uAUNq9Z6ymTgGhcm0UynUAB6tlbakBrz6CQFax3BXVQ=
+github.com/valyala/fastjson v1.6.4/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
