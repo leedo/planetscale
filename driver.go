@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 
 	"github.com/fastly/compute-sdk-go/fsthttp"
@@ -22,6 +21,8 @@ const (
 	executorMethod   = "POST"
 )
 
+var unknownError = fmt.Errorf("unknown error")
+
 type PsDriver struct{}
 
 type PsConn struct {
@@ -29,7 +30,7 @@ type PsConn struct {
 	password string
 	host     string
 	backend  string
-	session  *PsSession
+	session  []byte
 }
 
 func (d PsDriver) Open(dsn string) (driver.Conn, error) {
@@ -106,7 +107,6 @@ func (c *PsConn) Query(query string, args []driver.Value) (driver.Rows, error) {
 }
 
 func (c *PsConn) refreshSession(ctx context.Context) error {
-	log.Println("refreshing session")
 	req, err := c.buildRequest(sessionEndpoint, []byte("{}"))
 	if err != nil {
 		return err
@@ -120,7 +120,8 @@ func (c *PsConn) refreshSession(ctx context.Context) error {
 	var p fastjson.Parser
 	v, err := p.ParseBytes(respBody)
 
-	c.session = v.GetObject("session")
+	c.session = []byte{}
+	c.session = v.GetObject("session").MarshalTo(c.session)
 	return nil
 }
 
@@ -131,24 +132,43 @@ func (c *PsConn) QueryContext(ctx context.Context, query string, args []driver.V
 		}
 	}
 
-	log.Println("sending query")
-
-	q := json.Marshal(query)
+	q, err := json.Marshal(query)
+	if err != nil {
+		return nil, err
+	}
 
 	body := []byte(`{"query":`)
-	body = append(body, q[:])
-	body = append(body, []byte(`,"session"`))
-	body = c.session.MarshalTo(body)
-	body = append(body, []byte(`}`))
+	body = append(body, q[:]...)
+	body = append(body, []byte(`,"session":`)...)
+	body = append(body, c.session[:]...)
+	body = append(body, []byte(`}`)...)
 
 	req, err := c.buildRequest(executorEndpoint, body)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = c.sendRequest(ctx, req)
+	resp, err := c.sendRequest(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	var p fastjson.Parser
+	v, err := p.ParseBytes(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if session := v.GetObject("session"); session != nil {
+		c.session = []byte{}
+		c.session = session.MarshalTo(c.session)
+	}
+
+	if jsonErr := v.GetObject("error"); jsonErr != nil {
+		if msg := jsonErr.Get("message"); msg != nil {
+			return nil, fmt.Errorf("%s", msg.GetStringBytes())
+		}
+		return nil, unknownError
 	}
 
 	return nil, nil
