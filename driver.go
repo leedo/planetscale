@@ -36,6 +36,7 @@ func (d PsDriver) Open(dsn string) (driver.Conn, error) {
 	c.username = m.Get("username")
 	c.password = m.Get("password")
 	c.host = m.Get("host")
+	c.backend = m.Get("backend")
 
 	return &c, nil
 }
