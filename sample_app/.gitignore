@@ -1,0 +1,4 @@
+vendor
+planetscale_config.json
+pkg/*
+bin/main.wasm

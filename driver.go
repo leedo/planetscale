@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 
@@ -62,15 +63,21 @@ func (c *PsConn) buildApiReq(body string) (*fsthttp.Request, error) {
 }
 
 func (c *PsConn) Query(query string, args []driver.Value) (driver.Rows, error) {
+	return c.QueryContext(context.Background(), query, args)
+}
+
+func (c *PsConn) QueryContext(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
 	req, err := c.buildApiReq(query)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := req.Send(context.Background(), c.backend)
+	resp, err := req.Send(ctx, c.backend)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("%v+", resp)
 
 	return nil, nil
 }

@@ -1,0 +1,21 @@
+# This file describes a Fastly Compute@Edge package. To learn more visit:
+# https://developer.fastly.com/reference/fastly-toml/
+
+authors = ["laylward@gmail.com"]
+description = ""
+language = "go"
+manifest_version = 2
+name = "sample_app"
+service_id = ""
+
+[local_server]
+[local_server.backenends.planetscale]
+url = "https://aws.connect.psdb.cloud"
+
+[local_server.dictionaries]
+[local_server.dictionaries.planetscale_config]
+format="json"
+file="planetscale_config.json"
+
+[scripts]
+  build = "tinygo build -target=wasi -wasm-abi=generic -gc=conservative -o bin/main.wasm ./"
