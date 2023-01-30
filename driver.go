@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 
 	"github.com/fastly/compute-sdk-go/fsthttp"
@@ -171,6 +172,12 @@ func (c *PsConn) QueryContext(ctx context.Context, query string, args []driver.V
 		return nil, unknownError
 	}
 
+	result := v.GetObject("result")
+	if result == nil {
+		return nil, fmt.Errorf("no result")
+	}
+
+	log.Printf("%v", result.String())
 	return nil, nil
 }
 

@@ -12,7 +12,7 @@ import (
 
 func main() {
 	fsthttp.ServeFunc(func(ctx context.Context, w fsthttp.ResponseWriter, r *fsthttp.Request) {
-		const query = `SELECT * FROM users`
+		const query = `SELECT * FROM user`
 		conf, err := edgedict.Open("planetscale_config")
 		if err != nil {
 			w.WriteHeader(fsthttp.StatusBadGateway)
