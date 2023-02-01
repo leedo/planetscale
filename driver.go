@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
+	"strconv"
 
 	"github.com/fastly/compute-sdk-go/fsthttp"
 	"github.com/valyala/fastjson"
@@ -32,6 +32,20 @@ type PsConn struct {
 	host     string
 	backend  string
 	session  []byte
+}
+
+type PsField struct {
+	Name         string
+	Type         string
+	Table        string
+	ColumnLength uint
+	Charset      uint
+	Flags        uint
+}
+
+type PsRow struct {
+	Lengths []uint
+	Values  []byte
 }
 
 func (d PsDriver) Open(dsn string) (driver.Conn, error) {
@@ -107,6 +121,63 @@ func (c *PsConn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	return c.QueryContext(context.Background(), query, args)
 }
 
+//  {"fields":[{"name":"id","type":"INT32","table":"user","orgTable":"user","database":"activitypub","orgName":"id","columnLength":11,"charset":63,"flags":49667}],"rows":[{"lengths":["1"],"values":"MQ=="}]}
+
+func (c *PsConn) readFields(f *fastjson.Value) ([]PsField, error) {
+	if f == nil {
+		return nil, fmt.Errorf("missing fields")
+	}
+
+	var fields []PsField
+	for _, v := range f.GetArray() {
+		fields = append(fields, PsField{
+			Name:         string(v.GetStringBytes("name")),
+			Type:         string(v.GetStringBytes("type")),
+			Table:        string(v.GetStringBytes("table")),
+			ColumnLength: v.GetUint("columnLength"),
+			Charset:      v.GetUint("charset"),
+			Flags:        v.GetUint("flags"),
+		})
+	}
+
+	return fields, nil
+}
+
+func (c *PsConn) readRows(r *fastjson.Value) ([]PsRow, error) {
+	if r == nil {
+		return nil, fmt.Errorf("missing rows")
+	}
+
+	var rows []PsRow
+	for _, v := range r.GetArray() {
+		b := v.GetStringBytes("values")
+		dst := make([]byte, base64.StdEncoding.DecodedLen(len(b)))
+		n, err := base64.StdEncoding.Decode(dst, b)
+		if err != nil {
+			return nil, err
+		}
+		dst = dst[:n]
+
+		row := PsRow{
+			Values:  dst,
+			Lengths: make([]uint, 0),
+		}
+
+		for _, l := range v.GetArray("lengths") {
+			val := string(l.GetStringBytes())
+			i, err := strconv.ParseUint(val, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			row.Lengths = append(row.Lengths, uint(i))
+		}
+
+		rows = append(rows, row)
+	}
+
+	return rows, nil
+}
+
 func (c *PsConn) refreshSession(ctx context.Context) error {
 	req, err := c.buildRequest(sessionEndpoint, []byte("{}"))
 	if err != nil {
@@ -177,7 +248,16 @@ func (c *PsConn) QueryContext(ctx context.Context, query string, args []driver.V
 		return nil, fmt.Errorf("no result")
 	}
 
-	log.Printf("%v", result.String())
+	_, err = c.readFields(result.Get("fields"))
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = c.readRows(result.Get("rows"))
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
