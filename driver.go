@@ -44,8 +44,7 @@ type PsField struct {
 }
 
 type PsRow struct {
-	Lengths []uint
-	Values  []byte
+	Values [][]byte
 }
 
 func (d PsDriver) Open(dsn string) (driver.Conn, error) {
@@ -143,13 +142,15 @@ func (c *PsConn) readFields(f *fastjson.Value) ([]PsField, error) {
 	return fields, nil
 }
 
-func (c *PsConn) readRows(r *fastjson.Value) ([]PsRow, error) {
-	if r == nil {
+func (c *PsConn) readRows(v *fastjson.Value) ([]PsRow, error) {
+	if v == nil {
 		return nil, fmt.Errorf("missing rows")
 	}
 
-	var rows []PsRow
-	for _, v := range r.GetArray() {
+	r := v.GetArray()
+	rows := make([]PsRow, len(r))
+
+	for i, v := range r {
 		b := v.GetStringBytes("values")
 		dst := make([]byte, base64.StdEncoding.DecodedLen(len(b)))
 		n, err := base64.StdEncoding.Decode(dst, b)
@@ -158,21 +159,21 @@ func (c *PsConn) readRows(r *fastjson.Value) ([]PsRow, error) {
 		}
 		dst = dst[:n]
 
-		row := PsRow{
-			Values:  dst,
-			Lengths: make([]uint, 0),
-		}
+		lengths := v.GetArray("lengths")
+		row := PsRow{make([][]byte, len(lengths))}
 
-		for _, l := range v.GetArray("lengths") {
+		var pos uint64
+		for i, l := range lengths {
 			val := string(l.GetStringBytes())
-			i, err := strconv.ParseUint(val, 10, 64)
+			u, err := strconv.ParseUint(val, 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			row.Lengths = append(row.Lengths, uint(i))
+			row.Values[i] = dst[pos : pos+u]
+			pos += u
 		}
 
-		rows = append(rows, row)
+		rows[i] = row
 	}
 
 	return rows, nil
