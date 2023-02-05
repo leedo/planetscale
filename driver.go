@@ -47,6 +47,12 @@ type PsRow struct {
 	Values [][]byte
 }
 
+type PsResults struct {
+	Fields []PsField
+	Rows   []PsRow
+	pos    int
+}
+
 func (d PsDriver) Open(dsn string) (driver.Conn, error) {
 	m, err := url.ParseQuery(dsn)
 	if err != nil {
@@ -249,17 +255,43 @@ func (c *PsConn) QueryContext(ctx context.Context, query string, args []driver.V
 		return nil, fmt.Errorf("no result")
 	}
 
-	_, err = c.readFields(result.Get("fields"))
+	f, err := c.readFields(result.Get("fields"))
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = c.readRows(result.Get("rows"))
+	r, err := c.readRows(result.Get("rows"))
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	results := &PsResults{Fields: f, Rows: r}
+	return results, nil
+}
+
+func (r *PsResults) Columns() []string {
+	var cols []string
+	for _, f := range r.Fields {
+		cols = append(cols, f.Name)
+	}
+	return cols
+}
+
+func (r *PsResults) Close() error {
+	return nil
+}
+
+func (r *PsResults) Next(dest []driver.Value) error {
+	if len(r.Rows) > r.pos {
+		return sql.ErrNoRows
+	}
+
+	row := r.Rows[r.pos]
+
+	for i := 0; i != len(row.Values); i++ {
+		dest[i] = row.Values[i]
+	}
+	return nil
 }
 
 func init() {
