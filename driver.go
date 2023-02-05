@@ -69,6 +69,7 @@ func (d PsDriver) Open(dsn string) (driver.Conn, error) {
 }
 
 func (c *PsConn) Close() error {
+	c.session = nil
 	return nil
 }
 
@@ -125,8 +126,6 @@ func (c *PsConn) sendRequest(ctx context.Context, req *fsthttp.Request) ([]byte,
 func (c *PsConn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	return c.QueryContext(context.Background(), query, args)
 }
-
-//  {"fields":[{"name":"id","type":"INT32","table":"user","orgTable":"user","database":"activitypub","orgName":"id","columnLength":11,"charset":63,"flags":49667}],"rows":[{"lengths":["1"],"values":"MQ=="}]}
 
 func (c *PsConn) readFields(f *fastjson.Value) ([]PsField, error) {
 	if f == nil {
