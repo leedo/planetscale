@@ -282,8 +282,8 @@ func (r *PsResults) Close() error {
 }
 
 func (r *PsResults) Next(dest []driver.Value) error {
-	if len(r.Rows) > r.pos {
-		return sql.ErrNoRows
+	if r.pos+1 > len(r.Rows) {
+		return io.EOF
 	}
 
 	row := r.Rows[r.pos]
@@ -291,6 +291,8 @@ func (r *PsResults) Next(dest []driver.Value) error {
 	for i := 0; i != len(row.Values); i++ {
 		dest[i] = row.Values[i]
 	}
+
+	r.pos++
 	return nil
 }
 

@@ -60,8 +60,29 @@ func main() {
 			return
 		}
 
-		_, err = db.QueryContext(ctx, query)
+		rows, err := db.QueryContext(ctx, query)
 		if err != nil {
+			w.WriteHeader(fsthttp.StatusBadGateway)
+			fmt.Fprintln(w, err)
+			return
+		}
+
+		for rows.Next() {
+			var (
+				id   int64
+				name string
+			)
+
+			if err := rows.Scan(&id, &name); err != nil {
+				w.WriteHeader(fsthttp.StatusBadGateway)
+				fmt.Fprintln(w, err)
+				return
+			}
+
+			fmt.Fprintf(w, "%d %s", id, name)
+		}
+
+		if err := rows.Err(); err != nil {
 			w.WriteHeader(fsthttp.StatusBadGateway)
 			fmt.Fprintln(w, err)
 			return
