@@ -21,30 +21,12 @@ func readDSN() (string, error) {
 		return "", err
 	}
 
-	username, err := conf.Get("username")
-	if err != nil && username != "" {
+	dsn, err := conf.Get("dsn")
+	if err != nil && dsn != "" {
 		return "", err
 	}
 
-	password, err := conf.Get("password")
-	if err != nil && password != "" {
-		return "", err
-	}
-
-	host, err := conf.Get("host")
-	if err != nil && host != "" {
-		return "", err
-	}
-
-	backend, err := conf.Get("backend")
-	if err != nil && backend != "" {
-		return "", err
-	}
-
-	return fmt.Sprintf(
-		"username=%s&password=%s&host=%s&backend=%s",
-		username, password, host, backend,
-	), nil
+	return dsn, nil
 }
 
 func main() {
