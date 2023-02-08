@@ -17,9 +17,12 @@ import (
 )
 
 const (
-	executorEndpoint = "/psdb.v1alpha1.Database/Execute"
-	sessionEndpoint  = "/psdb.v1alpha1.Database/CreateSession"
+	apiPrefix        = "/psdb.v1alpha1.Database"
+	executorEndpoint = apiPrefix + "/Execute"
+	sessionEndpoint  = apiPrefix + "/CreateSession"
 	executorMethod   = "POST"
+	jsonContentType  = "application/json"
+	userAgent        = "database-go"
 )
 
 var unknownError = fmt.Errorf("unknown error")
@@ -59,13 +62,12 @@ func (d PsDriver) Open(dsn string) (driver.Conn, error) {
 		return nil, fmt.Errorf("error parsing dsn: %w", err)
 	}
 
-	var c PsConn
-	c.username = m.Get("username")
-	c.password = m.Get("password")
-	c.host = m.Get("host")
-	c.backend = m.Get("backend")
-
-	return &c, nil
+	return PsConn{
+		username: m.Get("username"),
+		password: m.Get("password"),
+		host:     m.Get("host"),
+		backend:  m.Get("backend"),
+	}, nil
 }
 
 func (c *PsConn) Close() error {
@@ -86,7 +88,7 @@ func (c *PsConn) Rollback() (driver.Stmt, error) {
 }
 
 func (c *PsConn) buildRequest(endpoint string, body []byte) (*fsthttp.Request, error) {
-	u := fmt.Sprintf("https://%s:%s@%s%s", c.username, c.password, c.host, endpoint)
+	u := "https://" + c.host + endpoint
 
 	req, err := fsthttp.NewRequest(executorMethod, u, nil)
 	if err != nil {
@@ -97,8 +99,8 @@ func (c *PsConn) buildRequest(endpoint string, body []byte) (*fsthttp.Request, e
 
 	auth := base64.StdEncoding.EncodeToString([]byte(c.username + ":" + c.password))
 	req.Header.Add("Host", c.host)
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("User-Agent", "database-go")
+	req.Header.Add("Content-Type", jsonContentType)
+	req.Header.Add("User-Agent", userAgent)
 	req.Header.Add("Authorization", "Basic "+auth)
 
 	return req, nil
