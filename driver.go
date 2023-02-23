@@ -70,16 +70,16 @@ func (d PsDriver) Open(dsn string) (driver.Conn, error) {
 	}, nil
 }
 
-func (c *PsConn) Close() error {
+func (c PsConn) Close() error {
 	c.session = nil
 	return nil
 }
 
-func (c *PsConn) Prepare(query string) (driver.Stmt, error) {
+func (c PsConn) Prepare(query string) (driver.Stmt, error) {
 	return nil, fmt.Errorf("Prepare method not implemented")
 }
 
-func (c *PsConn) Begin() (driver.Tx, error) {
+func (c PsConn) Begin() (driver.Tx, error) {
 	return nil, fmt.Errorf("Begin method not implemented")
 }
 
